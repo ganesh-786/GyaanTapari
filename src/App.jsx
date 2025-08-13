@@ -19,11 +19,11 @@ function App() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 items-stretch">
-          <div className="h-full" id="ganesh">
+          <div className="h-full" id="hangman">
             <Hangman />
           </div>
 
-          <div className="h-full" id="another">
+          <div className="h-full" id="typing">
             <TypingRace
               onFinish={(result) => {
                 setUserStats((prev) => ({

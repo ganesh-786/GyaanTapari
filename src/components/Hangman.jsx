@@ -1,11 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Play, X, Sparkles, Gift, RotateCcw } from "lucide-react";
 
-/**
- * Hangman component styled to match your NavBar UI.
- * Usage: <Hangman /> - it renders a card with "Play Hangman" button and launches modal game.
- */
-
 const DEFAULT_WORDS = [
   "REACT",
   "JAVASCRIPT",
@@ -227,47 +222,54 @@ const Hangman = ({ words = DEFAULT_WORDS, rewardXP = 50 }) => {
 
   return (
     <>
-      {/* Card: show a short preview and Play button */}
-      <div className="group bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 sm:p-6 border border-gray-200 hover:shadow-lg transition-all duration-300">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-cyan-500 rounded-lg flex items-center justify-center shadow-md">
-              <Gift className="w-6 h-6 text-white" />
+      {/* Responsive Hangman card */}
+      <div className="group bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 sm:p-6 md:p-8 border border-gray-200 hover:shadow-lg transition-all duration-300">
+        {/* Top row: stacks on mobile, horizontal on sm+ */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-3">
+          {/* Left: icon + title + description */}
+          <div className="flex items-start sm:items-center space-x-3 min-w-0 w-full">
+            <div className="w-12 h-12 sm:w-14 md:w-16 bg-gradient-to-r from-pink-500 to-cyan-500 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+              <Gift className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </div>
+
             <div className="min-w-0">
-              <h4 className="text-base sm:text-lg font-bold text-gray-800 truncate">
+              <h4 className="text-base sm:text-lg md:text-xl font-bold text-gray-800 truncate">
                 Hangman
               </h4>
-              <p className="text-xs sm:text-sm text-gray-600 truncate flex">
+              <p className="text-xs sm:text-sm md:text-base text-gray-600 truncate">
                 Word puzzle — guess the letters before you run out of tries
               </p>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setModalOpen(true)}
-            aria-haspopup="dialog"
-            aria-expanded={!!modalOpen}
-            className="ml-3 bg-gradient-to-r from-pink-500 to-cyan-500 text-white 
-             px-4 py-3 sm:px-3 sm:py-2 rounded-lg font-semibold 
-             text-sm sm:text-sm flex items-center justify-center gap-2
-             shadow-md hover:opacity-95 active:scale-[0.98] transform transition
-             focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-300"
-          >
-            <Play className="w-5 h-5 sm:w-4 sm:h-4" aria-hidden="true" />
-            <span className="leading-none">Play</span>
-          </button>
+          {/* Right: Play button - full width on mobile, auto width on sm+ */}
+          <div className="w-full sm:w-auto flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={!!modalOpen}
+              aria-label="Play Hangman"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 ml-0 sm:ml-3 px-4 py-3 sm:px-3 sm:py-2 rounded-lg font-semibold text-sm sm:text-sm text-white
+                   bg-gradient-to-r from-pink-500 to-cyan-500 shadow-md hover:opacity-95 active:scale-[0.98] transform transition
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-300"
+            >
+              <Play className="w-5 h-5 sm:w-4 sm:h-4" aria-hidden="true" />
+              <span className="leading-none">Play</span>
+            </button>
+          </div>
         </div>
 
-        <div className="text-xs text-gray-600">
-          <div className="flex items-center justify-between">
+        {/* Bottom row: reward and meta; stack vertically on mobile, horizontal on sm+ */}
+        <div className="text-xs sm:text-sm text-gray-600">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div className="flex items-center space-x-2">
               <Sparkles className="w-4 h-4 text-yellow-500" />
-              <span>Reward: {rewardXP} XP</span>
+              <span className="text-sm sm:text-sm">Reward: {rewardXP} XP</span>
             </div>
+
             <div className="text-right">
-              <span className="text-xs text-gray-500">
+              <span className="text-xs sm:text-sm text-gray-500 block">
                 Max mistakes: {maxWrong}
               </span>
             </div>

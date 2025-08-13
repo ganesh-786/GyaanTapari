@@ -25,23 +25,196 @@ import {
   X,
   Pilcrow,
   BrainCircuit,
+  UserRoundCheck,
 } from "lucide-react";
-
 // IMPORTANT: adjust this import path if your AI.jsx is located elsewhere.
 import { generateQuestions } from "./AI";
 
-const NavBar = () => {
-  const [selectedSubject, setSelectedSubject] = useState(null);
-  const [userStats, setUserStats] = useState({
-    totalXP: 2847,
-    badges: 12,
-    streakDays: 15,
-    level: 7,
-    rank: "Scholar",
-  });
-  const [currentView, setCurrentView] = useState("dashboard");
+// This NavBar has been adapted for the "no-login / initial-phase" scenario.
+// Behavior summary (implemented in-code):
+// - If no user exists on the server, a default user is created automatically.
+// - All progress (XP, subject stats, quiz history, achievements) is updated locally
+//   and persisted immediately to the json-server (PATCH to /users/:id).
+// - The UI derives its display from the single user object, and remains functional
+//   if the server is unreachable (falls back to local state).
 
-  // new quiz-related state
+const NavBar = () => {
+  // single user object (null while loading)
+  const [user, setUser] = useState(null);
+  const [loadingUser, setLoadingUser] = useState(true);
+
+  // used to persist small partial updates to the user on the server
+  const saveUserPartial = async (patch) => {
+    if (!user || !user.id) return;
+    try {
+      const res = await fetch(`http://localhost:3001/users/${user.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error(`PATCH failed ${res.status}`);
+      const updated = await res.json();
+      // merge updated fields into local user state
+      setUser((prev) => ({ ...prev, ...updated }));
+    } catch (err) {
+      console.error("Failed to save user partial:", err);
+    }
+  };
+
+  // create a sensible default user when none exists (neglecting signup/login)
+  const createInitialUser = async () => {
+    const now = new Date().toISOString();
+    const initial = {
+      username: "guest",
+      email: "guest@example.com",
+      passwordHash: "guest", // placeholder — for demo only
+      profile: {
+        displayName: "Guest",
+        avatar: "/avatars/guest.png",
+        level: 1,
+        rank: "Novice",
+        streakDays: 0,
+        totalXP: 0,
+        badges: 0,
+        bio: "",
+      },
+      subjects: {
+        math: {
+          progress: 0,
+          topicsCompleted: [],
+          nextMilestone: "Quadratic Equations",
+          lastPracticedAt: null,
+          weeklySessions: 0,
+          bestScore: 0,
+        },
+        science: {
+          progress: 0,
+          topicsCompleted: [],
+          nextMilestone: "Chemical Reactions",
+          lastPracticedAt: null,
+          weeklySessions: 0,
+          bestScore: 0,
+        },
+        english: {
+          progress: 0,
+          topicsCompleted: [],
+          nextMilestone: "Essay Writing",
+          lastPracticedAt: null,
+          weeklySessions: 0,
+          bestScore: 0,
+        },
+        history: {
+          progress: 0,
+          topicsCompleted: [],
+          nextMilestone: "World Wars",
+          lastPracticedAt: null,
+          weeklySessions: 0,
+          bestScore: 0,
+        },
+      },
+      achievements: [],
+      quizHistory: [],
+      settings: {
+        dailyReminder: true,
+        dailyReminderTime: "18:30",
+        language: "ne",
+        notifications: { email: false, push: true, sms: false },
+        theme: "system",
+      },
+      preferences: {
+        preferredStudyDurationMins: 30,
+        preferredStudyDays: ["mon", "wed", "fri"],
+        showHints: true,
+      },
+      activity: {
+        createdAt: now,
+        updatedAt: now,
+        lastLogin: now,
+      },
+    };
+
+    try {
+      const res = await fetch("http://localhost:3001/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(initial),
+      });
+      const created = await res.json();
+      setUser(created);
+      setLoadingUser(false);
+      return created;
+    } catch (err) {
+      console.error("Failed to create initial user:", err);
+      setLoadingUser(false);
+      return null;
+    }
+  };
+
+  // load user(s) on mount. If none exist, create the initial user.
+  useEffect(() => {
+    let mounted = true;
+    setLoadingUser(true);
+    fetch("http://localhost:3001/users")
+      .then((res) => res.json())
+      .then(async (data) => {
+        if (!mounted) return;
+        if (Array.isArray(data) && data.length > 0) {
+          // pick the first user by default for this "no-login" demo
+          setUser(data[0]);
+        } else {
+          // create default
+          await createInitialUser();
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch users:", err);
+        // keep UI usable with a local fallback initial user
+        const fallback = {
+          username: "guest",
+          profile: {
+            displayName: "Guest",
+            totalXP: 0,
+            badges: 0,
+            streakDays: 0,
+            level: 1,
+            rank: "Novice",
+          },
+          subjects: {},
+          achievements: [],
+          quizHistory: [],
+        };
+        setUser(fallback);
+      })
+      .finally(() => {
+        if (mounted) setLoadingUser(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // local UI-only stats (kept in sync with user.profile when available)
+  const [userStats, setUserStats] = useState({
+    totalXP: 0,
+    badges: 0,
+    streakDays: 0,
+    level: 1,
+    rank: "Novice",
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    setUserStats({
+      totalXP: user.profile?.totalXP ?? 0,
+      badges: user.profile?.badges ?? 0,
+      streakDays: user.profile?.streakDays ?? 0,
+      level: user.profile?.level ?? 1,
+      rank: user.profile?.rank ?? "Novice",
+    });
+  }, [user]);
+
+  const [currentView, setCurrentView] = useState("dashboard");
   const [quizQuestions, setQuizQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -50,74 +223,61 @@ const NavBar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loadingQuiz, setLoadingQuiz] = useState(false);
 
-  const subjects = [
-    {
+  // track which subject the active quiz belongs to (so we can update subject stats)
+  const [activeSubjectId, setActiveSubjectId] = useState(null);
+  const [quizStartTime, setQuizStartTime] = useState(null);
+
+  // templates for rendering subjects with icons/colors
+  const subjectTemplates = {
+    math: {
       id: "math",
       name: "Mathematics",
       icon: Calculator,
       color: "from-cyan-500 to-cyan-600",
-      progress: 78,
       topics: ["Algebra", "Geometry", "Statistics"],
-      nextMilestone: "Quadratic Equations",
     },
-    {
+    science: {
       id: "science",
       name: "Science",
       icon: FlaskConical,
       color: "from-green-500 to-green-600",
-      progress: 65,
       topics: ["Physics", "Chemistry", "Biology"],
-      nextMilestone: "Chemical Reactions",
     },
-    {
+    english: {
       id: "english",
       name: "English",
       icon: Book,
       color: "from-pink-500 to-pink-600",
-      progress: 82,
       topics: ["Literature", "Grammar", "Writing"],
-      nextMilestone: "Essay Writing",
     },
-    {
+    history: {
       id: "history",
       name: "Social Studies",
       icon: Users,
       color: "from-orange-500 to-orange-600",
-      progress: 45,
       topics: ["World History", "Geography", "Civics"],
-      nextMilestone: "World Wars",
     },
-  ];
+  };
 
-  const achievements = [
-    {
-      name: "Math Prodigy",
-      icon: Calculator,
-      earned: true,
-      difficulty: "Expert",
-    },
-    {
-      name: "Science Explorer",
-      icon: Atom,
-      earned: true,
-      difficulty: "Advanced",
-    },
-    { name: "Word Smith", icon: Book, earned: true, difficulty: "Expert" },
-    { name: "Speed Demon", icon: Zap, earned: false, difficulty: "Master" },
-    {
-      name: "Quiz Master",
-      icon: Trophy,
-      earned: false,
-      difficulty: "Legendary",
-    },
-    {
-      name: "Study Streak",
-      icon: Target,
-      earned: true,
-      difficulty: "Advanced",
-    },
-  ];
+  // build subjectsDisplay from templates and user's saved data
+  const subjectsDisplay = Object.keys(subjectTemplates).map((id) => {
+    const tmpl = subjectTemplates[id];
+    const userSub = user?.subjects?.[id] ?? {};
+    return {
+      id,
+      name: tmpl.name,
+      icon: tmpl.icon,
+      color: tmpl.color,
+      progress: userSub.progress ?? 0,
+      topics: tmpl.topics,
+      nextMilestone: userSub.nextMilestone ?? tmpl.nextMilestone ?? "",
+      lastPracticedAt: userSub.lastPracticedAt ?? null,
+      weeklySessions: userSub.weeklySessions ?? 0,
+      bestScore: userSub.bestScore ?? 0,
+    };
+  });
 
+  // study tips (kept in component so user preferences could later toggle)
   const studyTips = [
     "💡 The Feynman Technique: Explain concepts in simple terms to master them",
     "🧠 Spaced repetition helps move information from short-term to long-term memory",
@@ -125,12 +285,76 @@ const NavBar = () => {
     "🎯 Break large topics into smaller chunks for better understanding",
     "⚡ Take breaks every 25-50 minutes to maintain focus and retention",
   ];
-
   const [currentTip, setCurrentTip] = useState(0);
+  // achievements UI merge
+  const achievementTemplates = {
+    math_prodigy: {
+      id: "math_prodigy",
+      name: "Math Prodigy",
+      icon: Calculator,
+      difficulty: "Expert",
+    },
+    speed_demon: {
+      id: "speed_demon",
+      name: "Speed Demon",
+      icon: Zap,
+      difficulty: "Master",
+    },
+    science_explorer: {
+      id: "science_explorer",
+      name: "Science Explorer",
+      icon: Atom,
+      difficulty: "Advanced",
+    },
+    word_smith: {
+      id: "word_smith",
+      name: "Word Smith",
+      icon: Book,
+      difficulty: "Expert",
+    },
+    quiz_master: {
+      id: "quiz_master",
+      name: "Quiz Master",
+      icon: Trophy,
+      difficulty: "Legendary",
+    },
+    study_streak: {
+      id: "study_streak",
+      name: "Study Streak",
+      icon: Target,
+      difficulty: "Advanced",
+    },
+  };
+
+  const achievementsDisplay = (user?.achievements ?? []).map((ach) => {
+    const tpl = achievementTemplates[ach.id] ?? {
+      id: ach.id,
+      name: ach.name || ach.id,
+      icon: Trophy,
+      difficulty: "Unknown",
+    };
+    return {
+      id: ach.id,
+      name: tpl.name,
+      icon: tpl.icon,
+      earned: !!ach.earned,
+      difficulty: tpl.difficulty,
+      earnedAt: ach.earnedAt ?? null,
+    };
+  });
+
+  const achievementsFallback = Object.values(achievementTemplates).map((t) => ({
+    ...t,
+    earned: false,
+    earnedAt: null,
+  }));
 
   const startQuiz = async (subject) => {
     setLoadingQuiz(true);
     setMobileMenuOpen(false);
+    setActiveSubjectId(subject.id);
+    setQuizStartTime(Date.now());
+
     try {
       const generated = await generateQuestions(subject.name, 10);
 
@@ -149,12 +373,12 @@ const NavBar = () => {
     }
   };
 
-  const handleAnswer = (answerIndex) => {
+  // called whenever the user answers a question
+  const handleAnswer = async (answerIndex) => {
     const current = quizQuestions[currentQuestionIndex];
     if (!current) return;
 
     const isCorrect = (() => {
-      // AI returns correct as 0-based index. If it returned text, try to match.
       if (typeof current.correct === "number")
         return answerIndex === current.correct;
       if (typeof current.correct === "string")
@@ -165,7 +389,39 @@ const NavBar = () => {
     if (isCorrect) {
       setScore((s) => s + 1);
       setShowSuccess(true);
+
+      // update local UI stats immediately
       setUserStats((prev) => ({ ...prev, totalXP: prev.totalXP + 25 }));
+
+      // persist XP and simple subject progress increment to the server
+      if (user && user.id) {
+        const now = new Date().toISOString();
+        const updatedProfile = { ...(user.profile || {}) };
+        updatedProfile.totalXP = (updatedProfile.totalXP || 0) + 25;
+
+        // update subject stats (weeklySessions and lastPracticedAt)
+        const updatedSubjects = { ...(user.subjects || {}) };
+        const sid = activeSubjectId || current.subject || "math";
+        updatedSubjects[sid] = { ...(updatedSubjects[sid] || {}) };
+        updatedSubjects[sid].weeklySessions =
+          (updatedSubjects[sid].weeklySessions || 0) + 1;
+        updatedSubjects[sid].lastPracticedAt = now;
+
+        // patch server (profile + subjects)
+        const patch = {
+          profile: updatedProfile,
+          subjects: updatedSubjects,
+          activity: { ...(user.activity || {}), updatedAt: now },
+        };
+        // optimistically update local user
+        setUser((prev) => ({
+          ...prev,
+          profile: updatedProfile,
+          subjects: updatedSubjects,
+          activity: { ...(prev?.activity || {}), updatedAt: now },
+        }));
+        saveUserPartial(patch);
+      }
     } else {
       setShowSuccess(false);
     }
@@ -173,7 +429,7 @@ const NavBar = () => {
     setShowExplanation(true);
 
     // after a short delay, advance or finish
-    setTimeout(() => {
+    setTimeout(async () => {
       setShowExplanation(false);
       setShowSuccess(false);
 
@@ -181,12 +437,70 @@ const NavBar = () => {
       if (nextIndex < quizQuestions.length) {
         setCurrentQuestionIndex(nextIndex);
       } else {
-        // quiz finished
+        // quiz finished: record history, update bestScore and return to dashboard
+        const durationSeconds = Math.max(
+          0,
+          Math.floor((Date.now() - (quizStartTime || Date.now())) / 1000)
+        );
+        const quizRecord = {
+          quizId: `quiz-${new Date().toISOString().replace(/[:.]/g, "-")}`,
+          subject: activeSubjectId || current.subject || "math",
+          score: score,
+          total: quizQuestions.length,
+          takenAt: new Date().toISOString(),
+          durationSeconds,
+        };
+
+        // update local user object and persist
+        if (user && user.id) {
+          const now = new Date().toISOString();
+          const updatedSubjects = { ...(user.subjects || {}) };
+          const sid = activeSubjectId || current.subject || "math";
+          updatedSubjects[sid] = { ...(updatedSubjects[sid] || {}) };
+          updatedSubjects[sid].lastPracticedAt = now;
+          updatedSubjects[sid].weeklySessions =
+            (updatedSubjects[sid].weeklySessions || 0) + 0; // already incremented per-answer
+          updatedSubjects[sid].bestScore = Math.max(
+            updatedSubjects[sid].bestScore || 0,
+            score
+          );
+
+          const updatedQuizHistory = [...(user.quizHistory || []), quizRecord];
+
+          // update profile XP already incremented per-correct answer; ensure updatedAt
+          const updatedProfile = {
+            ...(user.profile || {}),
+            totalXP: user.profile?.totalXP ?? userStats.totalXP,
+          };
+
+          // optimistic local update
+          setUser((prev) => ({
+            ...prev,
+            subjects: updatedSubjects,
+            quizHistory: updatedQuizHistory,
+            profile: updatedProfile,
+            activity: { ...(prev?.activity || {}), updatedAt: now },
+          }));
+
+          // persist all important fields
+          const patch = {
+            subjects: updatedSubjects,
+            quizHistory: updatedQuizHistory,
+            profile: updatedProfile,
+            activity: { ...(user.activity || {}), updatedAt: now },
+          };
+          await saveUserPartial(patch);
+        }
+
+        // reset quiz state and return to dashboard
         setCurrentView("dashboard");
         setQuizQuestions([]);
         setCurrentQuestionIndex(0);
+        setActiveSubjectId(null);
+        setQuizStartTime(null);
+        setScore(0);
       }
-    }, 1500);
+    }, 1200);
   };
 
   const ProgressRing = ({ progress, size = 70 }) => {
@@ -242,7 +556,7 @@ const NavBar = () => {
     );
   };
 
-  // QUIZ VIEW: render questions generated by AI
+  // QUIZ VIEW
   if (currentView === "quiz" && quizQuestions.length > 0) {
     const q = quizQuestions[currentQuestionIndex];
 
@@ -346,7 +660,7 @@ const NavBar = () => {
     );
   }
 
-  // MAIN DASHBOARD view (unchanged except Practice button calling startQuiz)
+  // MAIN DASHBOARD view (renders from derived user state)
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-cyan-50">
       {/* Header */}
@@ -382,10 +696,23 @@ const NavBar = () => {
 
             {/* Desktop Stats */}
             <div className="hidden lg:flex items-center space-x-4 xl:space-x-6">
+              <div className="flex items-center space-x-2 sm:space-x-3 bg-cyan-50 px-3 sm:px-4 py-2 rounded-xl border border-cyan-200">
+                <UserRoundCheck className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600" />
+                <a href="#">
+                  <span className="font-semibold text-cyan-700 text-sm sm:text-base">
+                    {loadingUser
+                      ? "Hello!"
+                      : user
+                      ? `Hello, ${
+                          user.profile?.displayName ?? user.username ?? "Guest"
+                        }!`
+                      : "No valid user"}
+                  </span>
+                </a>
+              </div>
               <div className="flex items-center space-x-2 sm:space-x-3 bg-yellow-50 px-3 sm:px-4 py-2 rounded-xl border border-yellow-200">
                 <Gamepad2 className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
-                <a href="#ganesh">
-                  {" "}
+                <a href="#hangman">
                   <span className="font-semibold text-yellow-700 text-sm sm:text-base">
                     Hangman Game
                   </span>
@@ -393,17 +720,9 @@ const NavBar = () => {
               </div>
               <div className="flex items-center space-x-2 sm:space-x-3 bg-pink-50 px-3 sm:px-4 py-2 rounded-xl border border-pink-200">
                 <Pilcrow className="w-4 h-4 sm:w-5 sm:h-5 text-pink-600" />
-                <a href="#another">
+                <a href="#typing">
                   <span className="font-semibold text-pink-700 text-sm sm:text-base">
                     Typing Game
-                  </span>
-                </a>
-              </div>
-              <div className="flex items-center space-x-2 sm:space-x-3 bg-cyan-50 px-3 sm:px-4 py-2 rounded-xl border border-cyan-200">
-                <BrainCircuit className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600" />
-                <a href="#">
-                  <span className="font-semibold text-cyan-700 text-sm sm:text-base">
-                    Track with AI
                   </span>
                 </a>
               </div>
@@ -426,22 +745,32 @@ const NavBar = () => {
           <div className="lg:hidden mt-3 sm:mt-4">
             <div className="flex items-center justify-between space-x-2 sm:space-x-4">
               <div className="flex items-center space-x-2 bg-yellow-50 px-2 sm:px-3 py-1 sm:py-2 rounded-lg border border-yellow-200 flex-1">
-                <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-600" />
+                <UserRoundCheck className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-600" />
                 <span className="font-semibold text-yellow-700 text-xs sm:text-sm">
-                  {userStats.totalXP} XP
+                  {loadingUser
+                    ? "Hello!"
+                    : user
+                    ? `Hello, ${
+                        user.profile?.displayName ?? user.username ?? "Guest"
+                      }!`
+                    : "No valid user"}
                 </span>
               </div>
               <div className="flex items-center space-x-2 bg-pink-50 px-2 sm:px-3 py-1 sm:py-2 rounded-lg border border-pink-200 flex-1">
-                <Trophy className="w-3 h-3 sm:w-4 sm:h-4 text-pink-600" />
-                <span className="font-semibold text-pink-700 text-xs sm:text-sm">
-                  {userStats.rank}
-                </span>
+                <Gamepad2 className="w-3 h-3 sm:w-4 sm:h-4 text-pink-600" />
+                <a href="#hangman">
+                  <span className="font-semibold text-pink-700 text-xs sm:text-sm">
+                    Hangman
+                  </span>
+                </a>
               </div>
               <div className="flex items-center space-x-2 bg-cyan-50 px-2 sm:px-3 py-1 sm:py-2 rounded-lg border border-cyan-200 flex-1">
-                <Target className="w-3 h-3 sm:w-4 sm:h-4 text-cyan-600" />
-                <span className="font-semibold text-cyan-700 text-xs sm:text-sm">
-                  {userStats.streakDays} days
-                </span>
+                <Pilcrow className="w-3 h-3 sm:w-4 sm:h-4 text-cyan-600" />
+                <a href="#typing">
+                  <span className="font-semibold text-cyan-700 text-xs sm:text-sm">
+                    Typing
+                  </span>
+                </a>
               </div>
             </div>
           </div>
@@ -510,7 +839,7 @@ const NavBar = () => {
                   <p className="text-base sm:text-lg font-bold text-gray-800">
                     {userStats.rank}
                   </p>
-                  <p className="text-xs text-gray-600">Current Rank</p>
+                  <p className="text-xs sm:text-gray-600">Current Rank</p>
                 </div>
               </div>
             </div>
@@ -523,7 +852,7 @@ const NavBar = () => {
               </h3>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                {subjects.map((subject) => {
+                {subjectsDisplay.map((subject) => {
                   const IconComponent = subject.icon;
                   return (
                     <div
@@ -547,7 +876,10 @@ const NavBar = () => {
                           </div>
                         </div>
                         <div className="ml-3">
-                          <ProgressRing progress={subject.progress} size={50} />
+                          <ProgressRing
+                            progress={subject.progress ?? 0}
+                            size={50}
+                          />
                         </div>
                       </div>
 
@@ -571,7 +903,9 @@ const NavBar = () => {
                         >
                           <Play className="w-3 h-3 sm:w-4 sm:h-4" />
                           <span>
-                            {loadingQuiz ? "Preparing..." : "Practice"}
+                            {loadingQuiz && activeSubjectId === subject.id
+                              ? "Preparing..."
+                              : "Practice"}
                           </span>
                         </button>
                         <button className="flex-1 bg-gray-100 text-gray-700 px-3 sm:px-4 py-2 rounded-lg font-semibold hover:bg-gray-200 transition-all duration-200 flex items-center justify-center space-x-2 text-sm sm:text-base">
@@ -620,7 +954,10 @@ const NavBar = () => {
                 Achievements
               </h3>
               <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                {achievements.map((achievement, index) => {
+                {(achievementsDisplay.length > 0
+                  ? achievementsDisplay
+                  : achievementsFallback
+                ).map((achievement, index) => {
                   const IconComponent = achievement.icon;
                   return (
                     <div
