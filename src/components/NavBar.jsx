@@ -31,77 +31,104 @@ import { generateQuestions } from "./AI";
 
 const API_BASE = "http://localhost:3001/users";
 
+// Enhanced progress calculation with more granular scoring
 const calculateSubjectProgress = (subjectData) => {
   const {
     weeklySessions = 0,
     bestScore = 0,
     topicsCompleted = [],
     lastPracticedAt,
+    totalQuizzes = 0,
+    averageScore = 0,
   } = subjectData;
+
   let progress = 0;
-  progress += Math.min(weeklySessions * 4, 40);
-  progress += (bestScore / 10) * 30;
-  progress += Math.min(topicsCompleted.length * 4, 20);
+
+  // Weekly sessions contribution (max 35 points)
+  progress += Math.min(weeklySessions * 3, 35);
+
+  // Best score contribution (max 25 points)
+  progress += (bestScore / 10) * 25;
+
+  // Average score contribution (max 20 points)
+  progress += (averageScore / 10) * 20;
+
+  // Topics completed contribution (max 15 points)
+  progress += Math.min(topicsCompleted.length * 5, 15);
+
+  // Recency bonus (max 5 points)
   if (lastPracticedAt) {
-    const daysSince =
+    const daysSinceLastPractice =
       (Date.now() - new Date(lastPracticedAt)) / (1000 * 60 * 60 * 24);
-    if (daysSince < 7) progress += 10 - Math.min(daysSince, 7);
+    if (daysSinceLastPractice < 7) {
+      progress += Math.max(0, 5 - daysSinceLastPractice);
+    }
   }
+
   return Math.min(Math.round(progress), 100);
 };
 
-const subjectTemplates = {
-  math: {
-    id: "math",
-    name: "Mathematics",
-    icon: Calculator,
-    color: "from-cyan-500 to-cyan-600",
-    topics: ["Algebra", "Geometry", "Statistics"],
-  },
-  science: {
-    id: "science",
-    name: "Science",
-    icon: FlaskConical,
-    color: "from-green-500 to-green-600",
-    topics: ["Physics", "Chemistry", "Biology"],
-  },
-  english: {
-    id: "english",
-    name: "English",
-    icon: Book,
-    color: "from-pink-500 to-pink-600",
-    topics: ["Literature", "Grammar", "Writing"],
-  },
-  history: {
-    id: "history",
-    name: "Social Studies",
-    icon: Users,
-    color: "from-orange-500 to-orange-600",
-    topics: ["World History", "Geography", "Civics"],
-  },
+// Calculate weekly goal progress
+const calculateWeeklyProgress = (quizHistory = []) => {
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+  const weeklyQuizzes = quizHistory.filter(
+    (quiz) => new Date(quiz.takenAt) > oneWeekAgo
+  );
+
+  return {
+    completed: weeklyQuizzes.length,
+    total: 20,
+    percentage: Math.min((weeklyQuizzes.length / 20) * 100, 100),
+  };
+};
+
+// Calculate user level based on total XP
+const calculateUserLevel = (totalXP) => {
+  const level = Math.floor(totalXP / 1000) + 1;
+  const currentLevelXP = (level - 1) * 1000;
+  const nextLevelXP = level * 1000;
+  const progressToNextLevel =
+    ((totalXP - currentLevelXP) / (nextLevelXP - currentLevelXP)) * 100;
+
+  return {
+    level,
+    progressToNextLevel: Math.min(progressToNextLevel, 100),
+    currentLevelXP,
+    nextLevelXP,
+    xpToNextLevel: nextLevelXP - totalXP,
+  };
+};
+
+// Determine user rank based on level and achievements
+const calculateUserRank = (level, achievementsCount) => {
+  if (level >= 20 && achievementsCount >= 15) return "Master";
+  if (level >= 15 && achievementsCount >= 10) return "Expert";
+  if (level >= 10 && achievementsCount >= 8) return "Scholar";
+  if (level >= 5 && achievementsCount >= 5) return "Apprentice";
+  return "Novice";
 };
 
 const NavBar = () => {
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
-  const [currentView, setCurrentView] = useState("dashboard");
-  const [quizQuestions, setQuizQuestions] = useState([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [showExplanation, setShowExplanation] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [loadingQuiz, setLoadingQuiz] = useState(false);
-  const [activeSubjectId, setActiveSubjectId] = useState(null);
-  const [quizStartTime, setQuizStartTime] = useState(null);
+  const [weeklyGoal, setWeeklyGoal] = useState({
+    completed: 0,
+    total: 20,
+    percentage: 0,
+  });
 
+  // Refs for values updated rapidly inside handlers (to avoid stale closures)
   const scoreRef = useRef(0);
   const userRef = useRef(null);
 
+  // Keep userRef in sync with user state
   useEffect(() => {
     userRef.current = user;
   }, [user]);
 
-  // Simplified persistence helpers
+  // --- Persistence helpers ---
   const persistLocalSnapshot = (u) => {
     try {
       localStorage.setItem("gt_user_snapshot", JSON.stringify(u));
@@ -142,13 +169,13 @@ const NavBar = () => {
           toKeep.push(item);
         }
       }
+
       localStorage.setItem("gt_pending_patches", JSON.stringify(toKeep));
     } catch (e) {
       console.warn("Failed to flush pending patches", e);
     }
   };
 
-  // Unified patch function
   const patchUser = async (patch) => {
     const cur = userRef.current;
     if (!cur || !cur.id) {
@@ -182,64 +209,6 @@ const NavBar = () => {
     }
   };
 
-  // Simplified update functions
-  const updateUserData = async (updates) => {
-    return await patchUser({
-      ...updates,
-      activity: {
-        ...(user?.activity || {}),
-        updatedAt: new Date().toISOString(),
-      },
-    });
-  };
-
-  const updateSubject = async (subjectId, partialSubject) => {
-    const updatedSubjects = { ...(user?.subjects || {}) };
-    updatedSubjects[subjectId] = {
-      ...(updatedSubjects[subjectId] || {}),
-      ...partialSubject,
-    };
-    return await updateUserData({ subjects: updatedSubjects });
-  };
-
-  const addQuizRecord = async (quizRecord) => {
-    const updatedQuizHistory = [...(user?.quizHistory || []), quizRecord];
-    const sid = quizRecord.subject || "math";
-    const updatedSubjects = { ...(user?.subjects || {}) };
-    const subjectData = { ...(updatedSubjects[sid] || {}) };
-
-    subjectData.lastPracticedAt = quizRecord.takenAt;
-    subjectData.weeklySessions = (subjectData.weeklySessions || 0) + 1;
-    subjectData.bestScore = Math.max(
-      subjectData.bestScore || 0,
-      quizRecord.score
-    );
-    subjectData.progress = calculateSubjectProgress(subjectData);
-
-    if (quizRecord.score === quizRecord.total) {
-      const currentTopics = subjectData.topicsCompleted || [];
-      const template = subjectTemplates[sid];
-      if (template?.topics) {
-        const availableTopics = template.topics.filter(
-          (topic) => !currentTopics.includes(topic)
-        );
-        if (availableTopics.length > 0) {
-          const randomTopic =
-            availableTopics[Math.floor(Math.random() * availableTopics.length)];
-          subjectData.topicsCompleted = [...currentTopics, randomTopic];
-          subjectData.progress = calculateSubjectProgress(subjectData);
-        }
-      }
-    }
-
-    updatedSubjects[sid] = subjectData;
-    return await updateUserData({
-      quizHistory: updatedQuizHistory,
-      subjects: updatedSubjects,
-    });
-  };
-
-  // Create initial user
   const createInitialUser = async () => {
     const now = new Date().toISOString();
     const initial = {
@@ -256,19 +225,48 @@ const NavBar = () => {
         badges: 0,
         bio: "",
       },
-      subjects: Object.fromEntries(
-        Object.keys(subjectTemplates).map((id) => [
-          id,
-          {
-            progress: 0,
-            topicsCompleted: [],
-            nextMilestone: subjectTemplates[id].topics[0],
-            lastPracticedAt: null,
-            weeklySessions: 0,
-            bestScore: 0,
-          },
-        ])
-      ),
+      subjects: {
+        math: {
+          progress: 0,
+          topicsCompleted: [],
+          nextMilestone: "Quadratic Equations",
+          lastPracticedAt: null,
+          weeklySessions: 0,
+          bestScore: 0,
+          totalQuizzes: 0,
+          averageScore: 0,
+        },
+        science: {
+          progress: 0,
+          topicsCompleted: [],
+          nextMilestone: "Chemical Reactions",
+          lastPracticedAt: null,
+          weeklySessions: 0,
+          bestScore: 0,
+          totalQuizzes: 0,
+          averageScore: 0,
+        },
+        english: {
+          progress: 0,
+          topicsCompleted: [],
+          nextMilestone: "Essay Writing",
+          lastPracticedAt: null,
+          weeklySessions: 0,
+          bestScore: 0,
+          totalQuizzes: 0,
+          averageScore: 0,
+        },
+        history: {
+          progress: 0,
+          topicsCompleted: [],
+          nextMilestone: "World Wars",
+          lastPracticedAt: null,
+          weeklySessions: 0,
+          bestScore: 0,
+          totalQuizzes: 0,
+          averageScore: 0,
+        },
+      },
       achievements: [],
       quizHistory: [],
       settings: {
@@ -283,7 +281,11 @@ const NavBar = () => {
         preferredStudyDays: ["mon", "wed", "fri"],
         showHints: true,
       },
-      activity: { createdAt: now, updatedAt: now, lastLogin: now },
+      activity: {
+        createdAt: now,
+        updatedAt: now,
+        lastLogin: now,
+      },
     };
 
     try {
@@ -299,7 +301,10 @@ const NavBar = () => {
       setLoadingUser(false);
       return created;
     } catch (err) {
-      console.warn("Failed to create initial user, using fallback", err);
+      console.warn(
+        "Failed to create initial user, using fallback local user",
+        err
+      );
       setUser(initial);
       persistLocalSnapshot(initial);
       setLoadingUser(false);
@@ -339,37 +344,488 @@ const NavBar = () => {
         if (mounted) setLoadingUser(false);
       }
     };
+
     load();
     return () => (mounted = false);
   }, []);
 
-  // Update progress calculation effect
+  // Update weekly goal progress whenever user changes
   useEffect(() => {
-    if (!user?.subjects) return;
+    if (user && user.quizHistory) {
+      const weeklyProgress = calculateWeeklyProgress(user.quizHistory);
+      setWeeklyGoal(weeklyProgress);
+    }
+  }, [user]);
+
+  // --- Enhanced update helpers ---
+  const updateProfile = async (partialProfile) => {
+    const merged = { ...(user?.profile || {}), ...partialProfile };
+    return await patchUser({
+      profile: merged,
+      activity: {
+        ...(user?.activity || {}),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  };
+
+  const updateSettings = async (partialSettings) => {
+    const merged = { ...(user?.settings || {}), ...partialSettings };
+    return await patchUser({
+      settings: merged,
+      activity: {
+        ...(user?.activity || {}),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  };
+
+  const updatePreferences = async (partialPreferences) => {
+    const merged = { ...(user?.preferences || {}), ...partialPreferences };
+    return await patchUser({
+      preferences: merged,
+      activity: {
+        ...(user?.activity || {}),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  };
+
+  const updateSubject = async (subjectId, partialSubject) => {
+    const updatedSubjects = { ...(user?.subjects || {}) };
+    updatedSubjects[subjectId] = {
+      ...(updatedSubjects[subjectId] || {}),
+      ...partialSubject,
+    };
+
+    // Recalculate progress
+    updatedSubjects[subjectId].progress = calculateSubjectProgress(
+      updatedSubjects[subjectId]
+    );
+
+    return await patchUser({
+      subjects: updatedSubjects,
+      activity: {
+        ...(user?.activity || {}),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  };
+
+  // Enhanced achievement system
+  const checkAndAwardAchievements = async (quizRecord, updatedUser) => {
+    const newAchievements = [];
+    const currentAchievements = updatedUser.achievements || [];
+
+    // Helper to check if achievement already exists
+    const hasAchievement = (achievementId) =>
+      currentAchievements.some((a) => a.id === achievementId && a.earned);
+
+    // Perfect Score Achievement
+    if (
+      quizRecord.score === quizRecord.total &&
+      !hasAchievement("perfect_score")
+    ) {
+      newAchievements.push({
+        id: "perfect_score",
+        name: "Perfect Score",
+        description: "Got 100% on a quiz!",
+        earned: true,
+        earnedAt: new Date().toISOString(),
+        xpReward: 100,
+      });
+    }
+
+    // Quiz Master - 10 perfect scores
+    const perfectScores = (updatedUser.quizHistory || []).filter(
+      (q) => q.score === q.total
+    ).length;
+    if (perfectScores >= 10 && !hasAchievement("quiz_master")) {
+      newAchievements.push({
+        id: "quiz_master",
+        name: "Quiz Master",
+        description: "Achieved 10 perfect scores!",
+        earned: true,
+        earnedAt: new Date().toISOString(),
+        xpReward: 500,
+      });
+    }
+
+    // Speed Demon - Complete quiz in under 60 seconds
+    if (quizRecord.durationSeconds < 60 && !hasAchievement("speed_demon")) {
+      newAchievements.push({
+        id: "speed_demon",
+        name: "Speed Demon",
+        description: "Completed a quiz in under 60 seconds!",
+        earned: true,
+        earnedAt: new Date().toISOString(),
+        xpReward: 200,
+      });
+    }
+
+    // Scholar - Reach level 10
+    const userLevel = calculateUserLevel(updatedUser.profile?.totalXP || 0);
+    if (userLevel.level >= 10 && !hasAchievement("scholar")) {
+      newAchievements.push({
+        id: "scholar",
+        name: "Scholar",
+        description: "Reached level 10!",
+        earned: true,
+        earnedAt: new Date().toISOString(),
+        xpReward: 300,
+      });
+    }
+
+    // Weekly Warrior - Complete 20 quizzes in a week
+    const weeklyProgress = calculateWeeklyProgress(
+      updatedUser.quizHistory || []
+    );
+    if (weeklyProgress.completed >= 20 && !hasAchievement("weekly_warrior")) {
+      newAchievements.push({
+        id: "weekly_warrior",
+        name: "Weekly Warrior",
+        description: "Completed 20 quizzes in one week!",
+        earned: true,
+        earnedAt: new Date().toISOString(),
+        xpReward: 400,
+      });
+    }
+
+    // Subject Specialist - Complete 50 quizzes in one subject
+    const subjectQuizzes = (updatedUser.quizHistory || []).filter(
+      (q) => q.subject === quizRecord.subject
+    ).length;
+    if (
+      subjectQuizzes >= 50 &&
+      !hasAchievement(`${quizRecord.subject}_specialist`)
+    ) {
+      newAchievements.push({
+        id: `${quizRecord.subject}_specialist`,
+        name: `${
+          quizRecord.subject.charAt(0).toUpperCase() +
+          quizRecord.subject.slice(1)
+        } Specialist`,
+        description: `Completed 50 ${quizRecord.subject} quizzes!`,
+        earned: true,
+        earnedAt: new Date().toISOString(),
+        xpReward: 350,
+      });
+    }
+
+    return newAchievements;
+  };
+
+  // Enhanced quiz record addition with comprehensive updates
+  const addQuizRecord = async (quizRecord) => {
+    const currentUser = userRef.current;
+    if (!currentUser) return;
+
+    const updatedQuizHistory = [...(currentUser.quizHistory || []), quizRecord];
+    const sid = quizRecord.subject || "math";
+    const updatedSubjects = { ...(currentUser.subjects || {}) };
+
+    // Initialize subject if it doesn't exist
+    if (!updatedSubjects[sid]) {
+      updatedSubjects[sid] = {
+        progress: 0,
+        topicsCompleted: [],
+        nextMilestone: "",
+        lastPracticedAt: null,
+        weeklySessions: 0,
+        bestScore: 0,
+        totalQuizzes: 0,
+        averageScore: 0,
+      };
+    }
+
+    const subjectData = updatedSubjects[sid];
+
+    // Update subject statistics
+    subjectData.lastPracticedAt = quizRecord.takenAt;
+    subjectData.weeklySessions = (subjectData.weeklySessions || 0) + 1;
+    subjectData.bestScore = Math.max(
+      subjectData.bestScore || 0,
+      quizRecord.score
+    );
+    subjectData.totalQuizzes = (subjectData.totalQuizzes || 0) + 1;
+
+    // Calculate new average score
+    const totalPoints =
+      subjectData.averageScore * (subjectData.totalQuizzes - 1) +
+      quizRecord.score;
+    subjectData.averageScore = totalPoints / subjectData.totalQuizzes;
+
+    // Add completed topics for high scores
+    if (quizRecord.score >= quizRecord.total * 0.8) {
+      // 80% or higher
+      const subjectTemplate = subjectTemplates[sid];
+      if (subjectTemplate && subjectTemplate.topics) {
+        const currentTopics = subjectData.topicsCompleted || [];
+        const availableTopics = subjectTemplate.topics.filter(
+          (topic) => !currentTopics.includes(topic)
+        );
+        if (availableTopics.length > 0) {
+          const randomTopic =
+            availableTopics[Math.floor(Math.random() * availableTopics.length)];
+          subjectData.topicsCompleted = [...currentTopics, randomTopic];
+        }
+      }
+    }
+
+    // Calculate and update progress
+    subjectData.progress = calculateSubjectProgress(subjectData);
+
+    // Calculate XP earned
+    const baseXP = quizRecord.score * 25; // 25 XP per correct answer
+    const speedBonus = quizRecord.durationSeconds < 120 ? 50 : 0; // Speed bonus
+    const perfectBonus = quizRecord.score === quizRecord.total ? 100 : 0; // Perfect score bonus
+    const totalXPEarned = baseXP + speedBonus + perfectBonus;
+
+    // Update profile
+    const updatedProfile = { ...(currentUser.profile || {}) };
+    updatedProfile.totalXP = (updatedProfile.totalXP || 0) + totalXPEarned;
+
+    // Calculate new level and rank
+    const levelInfo = calculateUserLevel(updatedProfile.totalXP);
+    updatedProfile.level = levelInfo.level;
+    updatedProfile.rank = calculateUserRank(
+      levelInfo.level,
+      updatedProfile.badges || 0
+    );
+
+    // Update streak days (simplified - could be enhanced with actual date checking)
+    const lastQuiz = updatedQuizHistory[updatedQuizHistory.length - 2]; // Previous quiz
+    if (lastQuiz) {
+      const daysSinceLastQuiz =
+        (new Date(quizRecord.takenAt) - new Date(lastQuiz.takenAt)) /
+        (1000 * 60 * 60 * 24);
+      if (daysSinceLastQuiz <= 1) {
+        updatedProfile.streakDays = (updatedProfile.streakDays || 0) + 1;
+      } else if (daysSinceLastQuiz > 2) {
+        updatedProfile.streakDays = 1; // Reset streak
+      }
+    } else {
+      updatedProfile.streakDays = 1; // First quiz
+    }
+
+    // Temporary user for achievement checking
+    const tempUpdatedUser = {
+      ...currentUser,
+      quizHistory: updatedQuizHistory,
+      subjects: updatedSubjects,
+      profile: updatedProfile,
+    };
+
+    // Check for new achievements
+    const newAchievements = await checkAndAwardAchievements(
+      quizRecord,
+      tempUpdatedUser
+    );
+
+    // Update achievements and badges
+    let updatedAchievements = [...(currentUser.achievements || [])];
+    let additionalXP = 0;
+
+    for (const achievement of newAchievements) {
+      updatedAchievements.push(achievement);
+      additionalXP += achievement.xpReward || 0;
+      updatedProfile.badges = (updatedProfile.badges || 0) + 1;
+    }
+
+    // Add achievement XP
+    if (additionalXP > 0) {
+      updatedProfile.totalXP += additionalXP;
+      const newLevelInfo = calculateUserLevel(updatedProfile.totalXP);
+      updatedProfile.level = newLevelInfo.level;
+      updatedProfile.rank = calculateUserRank(
+        newLevelInfo.level,
+        updatedProfile.badges
+      );
+    }
+
+    // Final patch
+    return await patchUser({
+      quizHistory: updatedQuizHistory,
+      subjects: updatedSubjects,
+      profile: updatedProfile,
+      achievements: updatedAchievements,
+      activity: {
+        ...(currentUser.activity || {}),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  };
+
+  // Enhanced study click handler
+  const handleStudyClick = async (subject) => {
+    const currentSubjectData = user?.subjects?.[subject.id] || {};
+    const studyXP = 10; // XP for studying
+
+    const updatedData = {
+      lastPracticedAt: new Date().toISOString(),
+      weeklySessions: (currentSubjectData.weeklySessions || 0) + 1,
+    };
+
+    updatedData.progress = calculateSubjectProgress({
+      ...currentSubjectData,
+      ...updatedData,
+    });
+
+    // Update subject
+    await updateSubject(subject.id, updatedData);
+
+    // Award study XP
+    const updatedProfile = { ...(user?.profile || {}) };
+    updatedProfile.totalXP = (updatedProfile.totalXP || 0) + studyXP;
+
+    const levelInfo = calculateUserLevel(updatedProfile.totalXP);
+    updatedProfile.level = levelInfo.level;
+    updatedProfile.rank = calculateUserRank(
+      levelInfo.level,
+      updatedProfile.badges || 0
+    );
+
+    await updateProfile(updatedProfile);
+  };
+
+  // Auto-update progress on user changes
+  useEffect(() => {
+    if (!user || !user.subjects) return;
+
     let needsUpdate = false;
     const updatedSubjects = { ...user.subjects };
 
     Object.keys(updatedSubjects).forEach((subjectId) => {
       const subjectData = updatedSubjects[subjectId];
-      if (
-        typeof subjectData.progress === "undefined" ||
-        subjectData.progress === 0
-      ) {
-        const calculatedProgress = calculateSubjectProgress(subjectData);
-        if (calculatedProgress > 0) {
-          updatedSubjects[subjectId] = {
-            ...subjectData,
-            progress: calculatedProgress,
-          };
-          needsUpdate = true;
-        }
+      const calculatedProgress = calculateSubjectProgress(subjectData);
+
+      if (Math.abs((subjectData.progress || 0) - calculatedProgress) > 1) {
+        updatedSubjects[subjectId] = {
+          ...subjectData,
+          progress: calculatedProgress,
+        };
+        needsUpdate = true;
       }
     });
 
-    if (needsUpdate) patchUser({ subjects: updatedSubjects });
+    if (needsUpdate) {
+      patchUser({ subjects: updatedSubjects });
+    }
   }, [user?.subjects]);
 
-  // Quiz functions
+  const toggleAchievement = async (achId, earned = true) => {
+    const current = user?.achievements || [];
+    const idx = current.findIndex((a) => a.id === achId);
+    let next;
+    if (idx >= 0) {
+      next = current.map((a) =>
+        a.id === achId
+          ? { ...a, earned, earnedAt: earned ? new Date().toISOString() : null }
+          : a
+      );
+    } else {
+      next = [
+        ...current,
+        {
+          id: achId,
+          name: achId,
+          earned,
+          earnedAt: earned ? new Date().toISOString() : null,
+        },
+      ];
+    }
+    return await patchUser({ achievements: next });
+  };
+
+  // --- Derived UI helpers ---
+  const subjectTemplates = {
+    math: {
+      id: "math",
+      name: "Mathematics",
+      icon: Calculator,
+      color: "from-cyan-500 to-cyan-600",
+      topics: ["Algebra", "Geometry", "Statistics", "Calculus", "Trigonometry"],
+    },
+    science: {
+      id: "science",
+      name: "Science",
+      icon: FlaskConical,
+      color: "from-green-500 to-green-600",
+      topics: ["Physics", "Chemistry", "Biology", "Earth Science", "Astronomy"],
+    },
+    english: {
+      id: "english",
+      name: "English",
+      icon: Book,
+      color: "from-pink-500 to-pink-600",
+      topics: ["Literature", "Grammar", "Writing", "Reading", "Vocabulary"],
+    },
+    history: {
+      id: "history",
+      name: "Social Studies",
+      icon: Users,
+      color: "from-orange-500 to-orange-600",
+      topics: ["World History", "Geography", "Civics", "Economics", "Culture"],
+    },
+  };
+
+  const subjectsDisplay = Object.keys(subjectTemplates).map((id) => {
+    const tmpl = subjectTemplates[id];
+    const userSub = user?.subjects?.[id] ?? {};
+    return {
+      id,
+      name: tmpl.name,
+      icon: tmpl.icon,
+      color: tmpl.color,
+      progress: userSub.progress ?? 0,
+      topics: tmpl.topics,
+      nextMilestone: userSub.nextMilestone ?? tmpl.nextMilestone ?? "",
+      lastPracticedAt: userSub.lastPracticedAt ?? null,
+      weeklySessions: userSub.weeklySessions ?? 0,
+      bestScore: userSub.bestScore ?? 0,
+      averageScore: userSub.averageScore ?? 0,
+      totalQuizzes: userSub.totalQuizzes ?? 0,
+    };
+  });
+
+  // Local UI stats
+  const [userStats, setUserStats] = useState({
+    totalXP: 0,
+    badges: 0,
+    streakDays: 0,
+    level: 1,
+    rank: "Novice",
+    progressToNextLevel: 0,
+    xpToNextLevel: 1000,
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    const levelInfo = calculateUserLevel(user.profile?.totalXP ?? 0);
+    setUserStats({
+      totalXP: user.profile?.totalXP ?? 0,
+      badges: user.profile?.badges ?? 0,
+      streakDays: user.profile?.streakDays ?? 0,
+      level: levelInfo.level,
+      rank:
+        user.profile?.rank ??
+        calculateUserRank(levelInfo.level, user.profile?.badges ?? 0),
+      progressToNextLevel: levelInfo.progressToNextLevel,
+      xpToNextLevel: levelInfo.xpToNextLevel,
+    });
+  }, [user]);
+
+  // --- Quiz state ---
+  const [currentView, setCurrentView] = useState("dashboard");
+  const [quizQuestions, setQuizQuestions] = useState([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showExplanation, setShowExplanation] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [loadingQuiz, setLoadingQuiz] = useState(false);
+  const [activeSubjectId, setActiveSubjectId] = useState(null);
+  const [quizStartTime, setQuizStartTime] = useState(null);
+
   const startQuiz = async (subject) => {
     setLoadingQuiz(true);
     setMobileMenuOpen(false);
@@ -383,6 +839,8 @@ const NavBar = () => {
         setCurrentQuestionIndex(0);
         scoreRef.current = 0;
         setCurrentView("quiz");
+      } else {
+        console.warn("No questions generated, falling back to local sample.");
       }
     } catch (err) {
       console.error("Error generating quiz:", err);
@@ -405,33 +863,20 @@ const NavBar = () => {
 
     if (isCorrect) {
       setShowSuccess(true);
-      scoreRef.current += 1;
+      scoreRef.current = scoreRef.current + 1;
 
-      const updatedProfile = {
-        ...(user?.profile || {}),
-        totalXP: (user?.profile?.totalXP || 0) + 25,
-      };
-      const sid = activeSubjectId || current.subject || "math";
-      const updatedSubjects = { ...(user?.subjects || {}) };
-      updatedSubjects[sid] = {
-        ...(updatedSubjects[sid] || {}),
-        weeklySessions: (updatedSubjects[sid]?.weeklySessions || 0) + 1,
-        lastPracticedAt: new Date().toISOString(),
-      };
-
-      setUser((prev) => ({
-        ...(prev || {}),
-        profile: updatedProfile,
-        subjects: updatedSubjects,
+      // Update user stats optimistically for immediate UI feedback
+      setUserStats((prev) => ({
+        ...prev,
+        totalXP: prev.totalXP + 25,
       }));
-
-      patchUser({ profile: updatedProfile, subjects: updatedSubjects });
     } else {
       setShowSuccess(false);
     }
 
     setShowExplanation(true);
 
+    // After short delay advance or finish
     setTimeout(async () => {
       setShowExplanation(false);
       setShowSuccess(false);
@@ -440,20 +885,25 @@ const NavBar = () => {
       if (nextIndex < quizQuestions.length) {
         setCurrentQuestionIndex(nextIndex);
       } else {
+        // Finish quiz: compute final quiz record using scoreRef
         const durationSeconds = Math.max(
           0,
           Math.floor((Date.now() - (quizStartTime || Date.now())) / 1000)
         );
+        const finalScore = scoreRef.current;
         const quizRecord = {
           quizId: `quiz-${new Date().toISOString().replace(/[:.]/g, "-")}`,
           subject: activeSubjectId || current.subject || "math",
-          score: scoreRef.current,
+          score: finalScore,
           total: quizQuestions.length,
           takenAt: new Date().toISOString(),
           durationSeconds,
         };
 
+        // Add quiz record and update all related data
         await addQuizRecord(quizRecord);
+
+        // Reset quiz state
         setCurrentView("dashboard");
         setQuizQuestions([]);
         setCurrentQuestionIndex(0);
@@ -518,33 +968,7 @@ const NavBar = () => {
     );
   };
 
-  // Prepare display data
-  const subjectsDisplay = Object.keys(subjectTemplates).map((id) => {
-    const tmpl = subjectTemplates[id];
-    const userSub = user?.subjects?.[id] ?? {};
-    return {
-      id,
-      name: tmpl.name,
-      icon: tmpl.icon,
-      color: tmpl.color,
-      progress: userSub.progress ?? 0,
-      topics: tmpl.topics,
-      nextMilestone: userSub.nextMilestone ?? tmpl.topics?.[0] ?? "",
-      lastPracticedAt: userSub.lastPracticedAt ?? null,
-      weeklySessions: userSub.weeklySessions ?? 0,
-      bestScore: userSub.bestScore ?? 0,
-    };
-  });
-
-  const userStats = {
-    totalXP: user?.profile?.totalXP ?? 0,
-    badges: user?.profile?.badges ?? 0,
-    streakDays: user?.profile?.streakDays ?? 0,
-    level: user?.profile?.level ?? 1,
-    rank: user?.profile?.rank ?? "Novice",
-  };
-
-  // Quiz view
+  // --- RENDER QUIZ VIEW ---
   if (currentView === "quiz" && quizQuestions.length > 0) {
     const q = quizQuestions[currentQuestionIndex];
 
@@ -563,6 +987,21 @@ const NavBar = () => {
                 Question {currentQuestionIndex + 1} of {quizQuestions.length} —
                 Score: {scoreRef.current}
               </p>
+              <div className="flex justify-center items-center space-x-4 mt-3">
+                <div className="flex items-center space-x-1 text-blue-600">
+                  <Clock className="w-4 h-4" />
+                  <span className="text-sm">
+                    {Math.floor(
+                      (Date.now() - (quizStartTime || Date.now())) / 1000
+                    )}
+                    s
+                  </span>
+                </div>
+                <div className="flex items-center space-x-1 text-green-600">
+                  <Zap className="w-4 h-4" />
+                  <span className="text-sm">+{scoreRef.current * 25} XP</span>
+                </div>
+              </div>
             </div>
 
             <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-4 sm:p-6 mb-6 sm:mb-8 border-l-4 border-blue-500">
@@ -637,8 +1076,9 @@ const NavBar = () => {
               >
                 Exit Quiz
               </button>
+
               <div className="text-sm text-gray-500">
-                AI-powered quiz system
+                Progress tracking enabled
               </div>
             </div>
           </div>
@@ -647,7 +1087,7 @@ const NavBar = () => {
     );
   }
 
-  // Main dashboard
+  // --- MAIN DASHBOARD view ---
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-pink-50 to-cyan-50">
       {/* Header */}
@@ -681,50 +1121,38 @@ const NavBar = () => {
               </div>
             </div>
 
-            {/* Desktop Navigation */}
+            {/* Desktop Stats */}
             <div className="hidden lg:flex items-center space-x-4 xl:space-x-6">
-              {[
-                {
-                  icon: UserRoundCheck,
-                  text: loadingUser
-                    ? "Hello!"
-                    : user
-                    ? `Hello, ${
-                        user.profile?.displayName ?? user.username ?? "Guest"
-                      }!`
-                    : "No valid user",
-                  color: "cyan",
-                  href: "#",
-                },
-                {
-                  icon: Gamepad2,
-                  text: "Hangman Game",
-                  color: "yellow",
-                  href: "#hangman",
-                },
-                {
-                  icon: Pilcrow,
-                  text: "Typing Game",
-                  color: "pink",
-                  href: "#typing",
-                },
-              ].map((item, i) => (
-                <div
-                  key={i}
-                  className={`flex items-center space-x-2 sm:space-x-3 bg-${item.color}-50 px-3 sm:px-4 py-2 rounded-xl border border-${item.color}-200`}
-                >
-                  <item.icon
-                    className={`w-4 h-4 sm:w-5 sm:h-5 text-${item.color}-600`}
-                  />
-                  <a href={item.href}>
-                    <span
-                      className={`font-semibold text-${item.color}-700 text-sm sm:text-base`}
-                    >
-                      {item.text}
-                    </span>
-                  </a>
-                </div>
-              ))}
+              <div className="flex items-center space-x-2 sm:space-x-3 bg-cyan-50 px-3 sm:px-4 py-2 rounded-xl border border-cyan-200">
+                <UserRoundCheck className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600" />
+                <a href="#">
+                  <span className="font-semibold text-cyan-700 text-sm sm:text-base">
+                    {loadingUser
+                      ? "Hello!"
+                      : user
+                      ? `Hello, ${
+                          user.profile?.displayName ?? user.username ?? "Guest"
+                        }!`
+                      : "No valid user"}
+                  </span>
+                </a>
+              </div>
+              <div className="flex items-center space-x-2 sm:space-x-3 bg-yellow-50 px-3 sm:px-4 py-2 rounded-xl border border-yellow-200">
+                <Gamepad2 className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
+                <a href="#hangman">
+                  <span className="font-semibold text-yellow-700 text-sm sm:text-base">
+                    Hangman Game
+                  </span>
+                </a>
+              </div>
+              <div className="flex items-center space-x-2 sm:space-x-3 bg-pink-50 px-3 sm:px-4 py-2 rounded-xl border border-pink-200">
+                <Pilcrow className="w-4 h-4 sm:w-5 sm:h-5 text-pink-600" />
+                <a href="#typing">
+                  <span className="font-semibold text-pink-700 text-sm sm:text-base">
+                    Typing Game
+                  </span>
+                </a>
+              </div>
             </div>
 
             {/* Mobile Menu Button */}
@@ -740,58 +1168,37 @@ const NavBar = () => {
             </button>
           </div>
 
-          {/* Mobile Navigation */}
+          {/* Mobile Stats */}
           <div className="lg:hidden mt-3 sm:mt-4">
             <div className="flex items-center justify-between space-x-2 sm:space-x-4">
-              {[
-                {
-                  icon: UserRoundCheck,
-                  text: loadingUser
+              <div className="flex items-center space-x-2 bg-yellow-50 px-2 sm:px-3 py-1 sm:py-2 rounded-lg border border-yellow-200 flex-1">
+                <UserRoundCheck className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-600" />
+                <span className="font-semibold text-yellow-700 text-xs sm:text-sm">
+                  {loadingUser
                     ? "Hello!"
                     : user
                     ? `Hello, ${
                         user.profile?.displayName ?? user.username ?? "Guest"
                       }!`
-                    : "No valid user",
-                  color: "yellow",
-                },
-                {
-                  icon: Gamepad2,
-                  text: "Hangman",
-                  color: "pink",
-                  href: "#hangman",
-                },
-                {
-                  icon: Pilcrow,
-                  text: "Typing",
-                  color: "cyan",
-                  href: "#typing",
-                },
-              ].map((item, i) => (
-                <div
-                  key={i}
-                  className={`flex items-center space-x-2 bg-${item.color}-50 px-2 sm:px-3 py-1 sm:py-2 rounded-lg border border-${item.color}-200 flex-1`}
-                >
-                  <item.icon
-                    className={`w-3 h-3 sm:w-4 sm:h-4 text-${item.color}-600`}
-                  />
-                  {item.href ? (
-                    <a href={item.href}>
-                      <span
-                        className={`font-semibold text-${item.color}-700 text-xs sm:text-sm`}
-                      >
-                        {item.text}
-                      </span>
-                    </a>
-                  ) : (
-                    <span
-                      className={`font-semibold text-${item.color}-700 text-xs sm:text-sm`}
-                    >
-                      {item.text}
-                    </span>
-                  )}
-                </div>
-              ))}
+                    : "No valid user"}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2 bg-pink-50 px-2 sm:px-3 py-1 sm:py-2 rounded-lg border border-pink-200 flex-1">
+                <Gamepad2 className="w-3 h-3 sm:w-4 sm:h-4 text-pink-600" />
+                <a href="#hangman">
+                  <span className="font-semibold text-pink-700 text-xs sm:text-sm">
+                    Hangman
+                  </span>
+                </a>
+              </div>
+              <div className="flex items-center space-x-2 bg-cyan-50 px-2 sm:px-3 py-1 sm:py-2 rounded-lg border border-cyan-200 flex-1">
+                <Pilcrow className="w-3 h-3 sm:w-4 sm:h-4 text-cyan-600" />
+                <a href="#typing">
+                  <span className="font-semibold text-cyan-700 text-xs sm:text-sm">
+                    Typing
+                  </span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -801,7 +1208,7 @@ const NavBar = () => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-4 sm:space-y-6 lg:space-y-8">
-            {/* Welcome Section */}
+            {/* Enhanced Welcome Section */}
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border border-gray-200">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 sm:mb-6 space-y-3 sm:space-y-0">
                 <div className="flex-1 min-w-0">
@@ -811,6 +1218,16 @@ const NavBar = () => {
                   <p className="text-sm sm:text-base text-gray-600">
                     Continue your learning journey and unlock new achievements
                   </p>
+                  <div className="flex items-center space-x-4 mt-2">
+                    <span className="text-xs sm:text-sm text-green-600 font-medium">
+                      {userStats.xpToNextLevel > 0
+                        ? `${userStats.xpToNextLevel} XP to next level`
+                        : "Max level reached!"}
+                    </span>
+                    <span className="text-xs sm:text-sm text-purple-600 font-medium">
+                      {weeklyGoal.completed}/{weeklyGoal.total} weekly quizzes
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center sm:flex-col sm:items-end space-x-4 sm:space-x-0 sm:space-y-1">
                   <div className="flex items-center space-x-2 text-orange-600">
@@ -824,58 +1241,47 @@ const NavBar = () => {
                   </p>
                   <div className="w-16 sm:w-24 bg-gray-200 rounded-full h-2 mt-1 sm:mt-2">
                     <div
-                      className="bg-gradient-to-r from-orange-400 to-red-500 h-2 rounded-full"
-                      style={{ width: "68%" }}
+                      className="bg-gradient-to-r from-orange-400 to-red-500 h-2 rounded-full transition-all duration-1000"
+                      style={{ width: `${userStats.progressToNextLevel}%` }}
                     ></div>
                   </div>
                 </div>
               </div>
 
-              {/* Quick Stats */}
+              {/* Enhanced Quick Stats */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-                {[
-                  {
-                    icon: Sparkles,
-                    value: userStats.totalXP,
-                    label: "Total XP",
-                    color: "yellow",
-                  },
-                  {
-                    icon: Award,
-                    value: userStats.badges,
-                    label: "Achievements",
-                    color: "pink",
-                  },
-                  {
-                    icon: Target,
-                    value: userStats.streakDays,
-                    label: "Day Streak",
-                    color: "cyan",
-                  },
-                  {
-                    icon: TrendingUp,
-                    value: userStats.rank,
-                    label: "Current Rank",
-                    color: "green",
-                  },
-                ].map((stat, i) => (
-                  <div
-                    key={i}
-                    className={`bg-gradient-to-br from-${stat.color}-50 to-${stat.color}-100 rounded-xl p-3 sm:p-4 text-center border border-${stat.color}-200`}
-                  >
-                    <stat.icon
-                      className={`w-5 h-5 sm:w-6 sm:h-6 text-${stat.color}-600 mx-auto mb-2`}
-                    />
-                    <p className="text-base sm:text-lg font-bold text-gray-800">
-                      {stat.value}
-                    </p>
-                    <p className="text-xs text-gray-600">{stat.label}</p>
-                  </div>
-                ))}
+                <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-3 sm:p-4 text-center border border-yellow-200">
+                  <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 mx-auto mb-2" />
+                  <p className="text-base sm:text-lg font-bold text-gray-800">
+                    {userStats.totalXP.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-gray-600">Total XP</p>
+                </div>
+                <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-xl p-3 sm:p-4 text-center border border-pink-200">
+                  <Award className="w-5 h-5 sm:w-6 sm:h-6 text-pink-600 mx-auto mb-2" />
+                  <p className="text-base sm:text-lg font-bold text-gray-800">
+                    {userStats.badges}
+                  </p>
+                  <p className="text-xs text-gray-600">Achievements</p>
+                </div>
+                <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl p-3 sm:p-4 text-center border border-cyan-200">
+                  <Target className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-600 mx-auto mb-2" />
+                  <p className="text-base sm:text-lg font-bold text-gray-800">
+                    {userStats.streakDays}
+                  </p>
+                  <p className="text-xs text-gray-600">Day Streak</p>
+                </div>
+                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 sm:p-4 text-center border border-green-200">
+                  <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-green-600 mx-auto mb-2" />
+                  <p className="text-base sm:text-lg font-bold text-gray-800">
+                    {userStats.rank}
+                  </p>
+                  <p className="text-xs text-gray-600">Current Rank</p>
+                </div>
               </div>
             </div>
 
-            {/* Subjects Grid */}
+            {/* Enhanced Subjects Grid */}
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 lg:p-8 border border-gray-200">
               <h3 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4 sm:mb-6 flex items-center">
                 <Book className="w-5 h-5 sm:w-6 sm:h-6 mr-3 text-pink-600" />
@@ -904,6 +1310,14 @@ const NavBar = () => {
                             <p className="text-xs sm:text-sm text-gray-600 truncate">
                               Next: {subject.nextMilestone}
                             </p>
+                            <div className="flex items-center space-x-3 mt-1">
+                              <span className="text-xs text-green-600">
+                                Best: {subject.bestScore}/10
+                              </span>
+                              <span className="text-xs text-blue-600">
+                                Avg: {subject.averageScore.toFixed(1)}/10
+                              </span>
+                            </div>
                           </div>
                         </div>
                         <div className="ml-3">
@@ -915,15 +1329,55 @@ const NavBar = () => {
                       </div>
 
                       <div className="mb-4">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs text-gray-500">
+                            Topics Completed
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {
+                              subject.topics.filter((topic) =>
+                                user?.subjects?.[
+                                  subject.id
+                                ]?.topicsCompleted?.includes(topic)
+                              ).length
+                            }
+                            /{subject.topics.length}
+                          </span>
+                        </div>
                         <div className="flex flex-wrap gap-1 sm:gap-2">
-                          {subject.topics.slice(0, 3).map((topic, index) => (
-                            <span
-                              key={index}
-                              className="px-2 sm:px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium"
-                            >
-                              {topic}
-                            </span>
-                          ))}
+                          {subject.topics.slice(0, 3).map((topic, index) => {
+                            const isCompleted =
+                              user?.subjects?.[
+                                subject.id
+                              ]?.topicsCompleted?.includes(topic);
+                            return (
+                              <span
+                                key={index}
+                                className={`px-2 sm:px-3 py-1 rounded-full text-xs font-medium ${
+                                  isCompleted
+                                    ? "bg-green-100 text-green-700 border border-green-200"
+                                    : "bg-gray-100 text-gray-700"
+                                }`}
+                              >
+                                {topic} {isCompleted && "✓"}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 mb-4 text-xs">
+                        <div className="bg-blue-50 rounded-lg p-2 text-center">
+                          <div className="font-semibold text-blue-700">
+                            {subject.weeklySessions}
+                          </div>
+                          <div className="text-blue-600">This Week</div>
+                        </div>
+                        <div className="bg-purple-50 rounded-lg p-2 text-center">
+                          <div className="font-semibold text-purple-700">
+                            {subject.totalQuizzes || 0}
+                          </div>
+                          <div className="text-purple-600">Total Quizzes</div>
                         </div>
                       </div>
 
@@ -940,14 +1394,7 @@ const NavBar = () => {
                           </span>
                         </button>
                         <button
-                          onClick={() =>
-                            updateSubject(subject.id, {
-                              lastPracticedAt: new Date().toISOString(),
-                              weeklySessions:
-                                (user?.subjects?.[subject.id]?.weeklySessions ||
-                                  0) + 1,
-                            })
-                          }
+                          onClick={() => handleStudyClick(subject)}
                           className="flex-1 bg-gray-100 text-gray-700 px-3 sm:px-4 py-2 rounded-lg font-semibold hover:bg-gray-200 transition-all duration-200 flex items-center justify-center space-x-2 text-sm sm:text-base"
                         >
                           <Book className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -961,9 +1408,9 @@ const NavBar = () => {
             </div>
           </div>
 
-          {/* Sidebar */}
+          {/* Enhanced Sidebar */}
           <div className="space-y-4 sm:space-y-6">
-            {/* Weekly Goal */}
+            {/* Enhanced Weekly Goal */}
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-200">
               <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-4 flex items-center">
                 <Target className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-cyan-600" />
@@ -971,67 +1418,80 @@ const NavBar = () => {
               </h3>
               <div className="bg-gradient-to-r from-cyan-50 to-pink-50 rounded-xl p-3 sm:p-4 mb-4 border border-cyan-200">
                 <p className="text-gray-800 font-semibold mb-3 text-sm sm:text-base">
-                  Complete 20 practice sessions
+                  Complete {weeklyGoal.total} practice sessions
                 </p>
                 <div className="w-full bg-gray-200 rounded-full h-2 sm:h-3 mb-2">
                   <div
                     className="bg-gradient-to-r from-cyan-500 to-pink-500 h-2 sm:h-3 rounded-full transition-all duration-1000"
-                    style={{ width: "65%" }}
+                    style={{ width: `${weeklyGoal.percentage}%` }}
                   ></div>
                 </div>
                 <p className="text-xs sm:text-sm text-gray-600">
-                  13 of 20 completed
+                  {weeklyGoal.completed} of {weeklyGoal.total} completed
                 </p>
+                {weeklyGoal.percentage >= 100 && (
+                  <div className="mt-2 p-2 bg-green-100 rounded-lg">
+                    <p className="text-xs text-green-700 font-semibold">
+                      🎉 Goal Achieved! +400 XP
+                    </p>
+                  </div>
+                )}
               </div>
               <p className="text-xs sm:text-sm text-gray-600">
-                Reward: 200 XP + Achievement Badge
+                Reward: 400 XP + Achievement Badge
               </p>
             </div>
 
-            {/* Achievements */}
+            {/* Enhanced Achievements */}
             <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-200">
               <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-4 flex items-center">
                 <Award className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-pink-600" />
-                Achievements
+                Recent Achievements
               </h3>
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                {(user?.achievements && user.achievements.length > 0
-                  ? user.achievements
-                  : [
-                      {
-                        id: "placeholder",
-                        name: "No achievements yet",
-                        earned: false,
-                      },
-                    ]
-                ).map((achievement, index) => (
-                  <div
-                    key={index}
-                    className={`aspect-square rounded-xl flex flex-col items-center justify-center p-2 sm:p-3 border transition-all duration-200 hover:scale-105 ${
-                      achievement.earned
-                        ? "bg-gradient-to-br from-cyan-50 to-pink-50 border-cyan-200 text-cyan-700"
-                        : "bg-gray-50 border-gray-200 text-gray-400"
-                    }`}
-                  >
-                    <Trophy className="w-4 h-4 sm:w-6 sm:h-6 mb-1 sm:mb-2" />
-                    <p className="text-xs text-center font-semibold mb-1 leading-tight">
-                      {achievement.name || achievement.id}
-                    </p>
-                    <span
-                      className={`text-xs px-1 sm:px-2 py-1 rounded-full leading-none ${
-                        achievement.earned
-                          ? "bg-cyan-100 text-cyan-600"
-                          : "bg-gray-100 text-gray-500"
-                      }`}
+              <div className="space-y-3">
+                {(user?.achievements || [])
+                  .filter((a) => a.earned)
+                  .slice(0, 3)
+                  .map((achievement, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center space-x-3 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border border-yellow-200"
                     >
-                      {achievement.earned ? "Earned" : "Locked"}
-                    </span>
+                      <div className="w-8 h-8 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <Trophy className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-800 truncate">
+                          {achievement.name}
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          {new Date(achievement.earnedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {achievement.xpReward && (
+                        <span className="text-xs font-bold text-green-600">
+                          +{achievement.xpReward} XP
+                        </span>
+                      )}
+                    </div>
+                  ))}
+
+                {(!user?.achievements ||
+                  user.achievements.filter((a) => a.earned).length === 0) && (
+                  <div className="text-center py-4">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                      <Trophy className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <p className="text-sm text-gray-500">No achievements yet</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Complete quizzes to unlock achievements!
+                    </p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
-            {/* Study Tips */}
+            {/* Enhanced Study Tips */}
             <div className="bg-gradient-to-br from-pink-500 to-cyan-500 rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 text-white">
               <h3 className="text-base sm:text-lg font-bold mb-4 flex items-center">
                 <Brain className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
@@ -1043,13 +1503,106 @@ const NavBar = () => {
                   master them
                 </p>
               </div>
-              <button className="bg-white/20 hover:bg-white/30 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center space-x-2 mx-auto border border-white/20">
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                <div className="bg-white/10 rounded-lg p-2 text-center">
+                  <div className="text-lg font-bold">
+                    {user?.quizHistory
+                      ? Math.round(
+                          (user.quizHistory.reduce(
+                            (acc, quiz) => acc + quiz.score,
+                            0
+                          ) /
+                            user.quizHistory.length) *
+                            10
+                        )
+                      : 0}
+                    %
+                  </div>
+                  <div className="text-xs opacity-90">Avg Score</div>
+                </div>
+                <div className="bg-white/10 rounded-lg p-2 text-center">
+                  <div className="text-lg font-bold">
+                    {user?.quizHistory?.length || 0}
+                  </div>
+                  <div className="text-xs opacity-90">Total Quizzes</div>
+                </div>
+              </div>
+              <button
+                onClick={() => {}}
+                className="bg-white/20 hover:bg-white/30 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 flex items-center space-x-2 mx-auto border border-white/20"
+              >
                 <RotateCcw className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span>Next Tip</span>
               </button>
             </div>
+
+            {/* Performance Analytics */}
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 border border-gray-200">
+              <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-4 flex items-center">
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 mr-2 text-green-600" />
+                This Week
+              </h3>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Quizzes Taken</span>
+                  <span className="font-semibold text-gray-800">
+                    {weeklyGoal.completed}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">XP Earned</span>
+                  <span className="font-semibold text-gray-800">
+                    {user?.quizHistory
+                      ? user.quizHistory
+                          .filter(
+                            (quiz) =>
+                              new Date(quiz.takenAt) >
+                              new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+                          )
+                          .reduce((acc, quiz) => acc + quiz.score * 25, 0)
+                      : 0}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Study Sessions</span>
+                  <span className="font-semibold text-gray-800">
+                    {Object.values(user?.subjects || {}).reduce(
+                      (acc, subject) => acc + (subject.weeklySessions || 0),
+                      0
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Current Streak</span>
+                  <div className="flex items-center space-x-1">
+                    <span className="font-semibold text-gray-800">
+                      {userStats.streakDays}
+                    </span>
+                    <span className="text-orange-500">🔥</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* Achievement Notification (could be triggered by new achievements) */}
+        {false && ( // This would be controlled by state showing when new achievements are earned
+          <div className="fixed bottom-4 right-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white p-4 rounded-xl shadow-2xl animate-bounce z-50">
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                <Trophy className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="font-bold">Achievement Unlocked!</p>
+                <p className="text-sm opacity-90">
+                  Quiz Master - 10 Perfect Scores
+                </p>
+                <p className="text-xs opacity-75">+500 XP</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

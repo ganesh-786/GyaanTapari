@@ -8,49 +8,64 @@
       "profile": {
         "displayName": "Ganesh",
         "avatar": "/avatars/ganesh.png",
-        "level": 7,
-        "rank": "Scholar",
-        "streakDays": 15,
-        "totalXP": 5122,
-        "badges": 12,
+        "level": 9,
+        "rank": "Apprentice",
+        "streakDays": 20,
+        "totalXP": 8492,
+        "badges": 14,
         "bio": ""
       },
       "subjects": {
         "math": {
-          "progress": 77,
+          "progress": 72,
           "topicsCompleted": [
-            "Algebra"
+            "Algebra",
+            "Geometry"
           ],
           "nextMilestone": "Quadratic Equations",
-          "lastPracticedAt": "2025-08-13T15:45:43.432Z",
-          "weeklySessions": 9,
-          "bestScore": 9
+          "lastPracticedAt": "2025-08-14T03:09:28.024Z",
+          "weeklySessions": 37,
+          "bestScore": 9,
+          "totalQuizzes": 1,
+          "averageScore": null
         },
         "science": {
-          "progress": 84,
+          "progress": 80,
           "topicsCompleted": [
-            "Biology"
+            "Biology",
+            "Physics",
+            "Astronomy"
           ],
           "nextMilestone": "Chemical Reactions",
-          "lastPracticedAt": "2025-08-13T17:02:45.640Z",
-          "weeklySessions": 39,
-          "bestScore": 10
+          "lastPracticedAt": "2025-08-14T04:27:26.840Z",
+          "weeklySessions": 80,
+          "bestScore": 10,
+          "totalQuizzes": 1,
+          "averageScore": null
         },
         "english": {
-          "progress": 81,
+          "progress": 72,
           "topicsCompleted": [
-            "Grammar"
+            "Grammar",
+            "Reading"
           ],
           "nextMilestone": "Essay Writing",
-          "lastPracticedAt": "2025-08-13T16:48:32.468Z",
-          "weeklySessions": 15,
-          "bestScore": 9
+          "lastPracticedAt": "2025-08-14T07:30:42.012Z",
+          "weeklySessions": 16,
+          "bestScore": 9,
+          "totalQuizzes": 1,
+          "averageScore": null
         },
         "history": {
-          "weeklySessions": 38,
-          "lastPracticedAt": "2025-08-13T16:43:30.814Z",
-          "bestScore": 8,
-          "progress": 74
+          "weeklySessions": 40,
+          "lastPracticedAt": "2025-08-14T04:29:56.744Z",
+          "bestScore": 9,
+          "progress": 77,
+          "totalQuizzes": 2,
+          "averageScore": 4.5,
+          "topicsCompleted": [
+            "Economics"
+          ]
         }
       },
       "achievements": [
@@ -65,6 +80,22 @@
           "name": "Speed Demon",
           "earned": false,
           "earnedAt": null
+        },
+        {
+          "id": "weekly_warrior",
+          "name": "Weekly Warrior",
+          "description": "Completed 20 quizzes in one week!",
+          "earned": true,
+          "earnedAt": "2025-08-14T03:09:28.027Z",
+          "xpReward": 400
+        },
+        {
+          "id": "perfect_score",
+          "name": "Perfect Score",
+          "description": "Got 100% on a quiz!",
+          "earned": true,
+          "earnedAt": "2025-08-14T03:11:31.364Z",
+          "xpReward": 100
         }
       ],
       "quizHistory": [
@@ -187,6 +218,102 @@
           "total": 10,
           "takenAt": "2025-08-13T17:02:45.640Z",
           "durationSeconds": 120
+        },
+        {
+          "quizId": "quiz-2025-08-14T02-41-27-843Z",
+          "subject": "science",
+          "score": 10,
+          "total": 10,
+          "takenAt": "2025-08-14T02:41:27.843Z",
+          "durationSeconds": 83
+        },
+        {
+          "quizId": "quiz-2025-08-14T02-43-04-204Z",
+          "subject": "science",
+          "score": 9,
+          "total": 10,
+          "takenAt": "2025-08-14T02:43:04.204Z",
+          "durationSeconds": 84
+        },
+        {
+          "quizId": "quiz-2025-08-14T02-45-04-524Z",
+          "subject": "science",
+          "score": 9,
+          "total": 10,
+          "takenAt": "2025-08-14T02:45:04.524Z",
+          "durationSeconds": 114
+        },
+        {
+          "quizId": "quiz-2025-08-14T02-46-29-761Z",
+          "subject": "science",
+          "score": 9,
+          "total": 10,
+          "takenAt": "2025-08-14T02:46:29.761Z",
+          "durationSeconds": 76
+        },
+        {
+          "quizId": "quiz-2025-08-14T02-49-11-584Z",
+          "subject": "math",
+          "score": 9,
+          "total": 10,
+          "takenAt": "2025-08-14T02:49:11.584Z",
+          "durationSeconds": 150
+        },
+        {
+          "quizId": "quiz-2025-08-14T02-50-42-878Z",
+          "subject": "math",
+          "score": 9,
+          "total": 10,
+          "takenAt": "2025-08-14T02:50:42.878Z",
+          "durationSeconds": 79
+        },
+        {
+          "quizId": "quiz-2025-08-14T02-55-09-816Z",
+          "subject": "math",
+          "score": 9,
+          "total": 10,
+          "takenAt": "2025-08-14T02:55:09.816Z",
+          "durationSeconds": 116
+        },
+        {
+          "quizId": "quiz-2025-08-14T03-09-28-024Z",
+          "subject": "math",
+          "score": 8,
+          "total": 10,
+          "takenAt": "2025-08-14T03:09:28.024Z",
+          "durationSeconds": 172
+        },
+        {
+          "quizId": "quiz-2025-08-14T03-11-31-364Z",
+          "subject": "science",
+          "score": 10,
+          "total": 10,
+          "takenAt": "2025-08-14T03:11:31.364Z",
+          "durationSeconds": 95
+        },
+        {
+          "quizId": "quiz-2025-08-14T03-14-29-501Z",
+          "subject": "history",
+          "score": 5,
+          "total": 10,
+          "takenAt": "2025-08-14T03:14:29.501Z",
+          "durationSeconds": 99
+        },
+        {
+          "quizId": "quiz-2025-08-14T04-29-56-744Z",
+          "subject": "history",
+          "score": 9,
+          "total": 10,
+          "takenAt": "2025-08-14T04:29:56.744Z",
+          "durationSeconds": 145
+        },
+        {
+          "quizId": "quiz-2025-08-14T07-30-42-011Z",
+          "subject": "english",
+          "score": 8,
+          "total": 10,
+          "takenAt": "2025-08-14T07:30:42.012Z",
+          "durationSeconds": 92
         }
       ],
       "settings": {
@@ -211,7 +338,7 @@
       },
       "activity": {
         "createdAt": "2025-08-13T07:00:00.000Z",
-        "updatedAt": "2025-08-13T17:02:45.640Z",
+        "updatedAt": "2025-08-14T07:30:42.013Z",
         "lastLogin": "2025-08-13T09:05:00.000Z"
       }
     }
