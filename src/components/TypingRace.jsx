@@ -1,20 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Play, X, Trophy, Clock, Zap, RotateCcw } from "lucide-react";
 
-/**
- * TypingRace component (single-player)
- *
- * Props:
- * - passages?: string[]        // array of passages to race on (defaults included)
- * - timeLimit?: number         // time limit seconds (optional, 0 = no limit)
- * - rewardXP?: number          // how much XP to reward for a win (optional)
- * - onFinish?: (result) => {}  // callback called when race ends, receives result object
- *
- * Integrate into your dashboard similarly to Hangman:
- * import TypingRace from "../components/TypingRace";
- * <TypingRace onFinish={(r) => console.log(r)} />
- */
-
 const DEFAULT_PASSAGES = [
   "Typing fast comes from consistent practice. Keep calm and focus on accuracy first.",
   "React components let you build UI with reusable pieces and state handled with hooks.",
@@ -220,44 +206,53 @@ const TypingRace = ({
 
   return (
     <>
-      {/* Card preview */}
-      <div className="group bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 sm:p-6 border border-gray-200 hover:shadow-lg transition-all duration-300">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 bg-gradient-to-r from-cyan-500 to-pink-500 rounded-lg flex items-center justify-center shadow-md">
-              <Zap className="w-6 h-6 text-white" />
+      {/* Responsive Typing Race card */}
+      <div className="group bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 sm:p-6 md:p-8 border border-gray-200 hover:shadow-lg transition-all duration-300">
+        {/* Top row: stacks on mobile, horizontal on sm+ */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 gap-3">
+          {/* Left: icon + title + description */}
+          <div className="flex items-start sm:items-center space-x-3 min-w-0 w-full">
+            <div className="w-12 h-12 sm:w-14 md:w-16 bg-gradient-to-r from-cyan-500 to-pink-500 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
+              <Zap className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </div>
+
             <div className="min-w-0">
-              <h4 className="text-base sm:text-lg font-bold text-gray-800 truncate">
+              <h4 className="text-base sm:text-lg md:text-xl font-bold text-gray-800 truncate">
                 Typing Race
               </h4>
-              <p className="text-xs sm:text-sm text-gray-600 truncate">
+              <p className="text-xs sm:text-sm md:text-base text-gray-600 truncate">
                 Improve your speed & accuracy — race against the clock
               </p>
             </div>
           </div>
 
-          <button
-            onClick={startRace}
-            className="ml-3 bg-gradient-to-r from-cyan-500 to-pink-500 text-white px-3 py-2 rounded-lg font-semibold hover:opacity-95 transition"
-          >
-            <div className="flex items-center space-x-2">
-              <Play className="w-4 h-4" />
-              <span>Start</span>
-            </div>
-          </button>
+          {/* Right: Start button - full width on mobile for easier tapping */}
+          <div className="w-full sm:w-auto flex-shrink-0">
+            <button
+              onClick={startRace}
+              aria-label="Start Typing Race"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 ml-0 sm:ml-3 px-4 py-3 sm:px-3 sm:py-2 rounded-lg font-semibold text-sm sm:text-sm text-white
+                   bg-gradient-to-r from-cyan-500 to-pink-500 shadow-md hover:opacity-95 active:scale-[0.98] transform transition
+                   focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-300"
+            >
+              <Play className="w-4 h-4 sm:w-4 sm:h-4" aria-hidden="true" />
+              <span className="leading-none">Start</span>
+            </button>
+          </div>
         </div>
 
-        <div className="text-xs text-gray-600">
-          <div className="flex items-center justify-between">
+        {/* Bottom row: meta info stacks on mobile, horizontal on sm+ */}
+        <div className="text-xs sm:text-sm text-gray-600">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div className="flex items-center space-x-2">
-              <Clock className="w-4 h-4 text-gray-500" />
-              <span>
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500" />
+              <span className="text-sm sm:text-sm">
                 Time limit: {timeLimit > 0 ? `${timeLimit}s` : "none"}
               </span>
             </div>
+
             <div className="text-right">
-              <span className="text-xs text-gray-500">
+              <span className="text-xs sm:text-sm text-gray-500 block">
                 Reward: {rewardXP} XP
               </span>
             </div>
