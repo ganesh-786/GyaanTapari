@@ -1,11 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Play, X, Trophy, Clock, Zap, RotateCcw } from "lucide-react";
+import {
+  Play,
+  X,
+  Trophy,
+  Clock,
+  Zap,
+  RotateCcw,
+  KeyboardIcon,
+} from "lucide-react";
 
 const DEFAULT_PASSAGES = [
   "Typing fast comes from consistent practice. Keep calm and focus on accuracy first.",
   "React components let you build UI with reusable pieces and state handled with hooks.",
-  "A journey of a thousand miles begins with a single step — keep learning every day.",
+  "A journey of a thousand miles begins with a single step and keep learning every day.",
   "Small, focused practice sessions beat long, unfocused ones. Try the Pomodoro rhythm.",
+  "The quick fox jumps over the lazy dog.",
 ];
 
 const TypingRace = ({
@@ -213,7 +222,7 @@ const TypingRace = ({
           {/* Left: icon + title + description */}
           <div className="flex items-start sm:items-center space-x-3 min-w-0 w-full">
             <div className="w-12 h-12 sm:w-14 md:w-16 bg-gradient-to-r from-cyan-500 to-pink-500 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
-              <Zap className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+              <KeyboardIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </div>
 
             <div className="min-w-0">

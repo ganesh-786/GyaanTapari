@@ -8,11 +8,11 @@
       "profile": {
         "displayName": "Ganesh",
         "avatar": "/avatars/ganesh.png",
-        "level": 9,
-        "rank": "Apprentice",
-        "streakDays": 20,
-        "totalXP": 8492,
-        "badges": 14,
+        "level": 11,
+        "rank": "Scholar",
+        "streakDays": 25,
+        "totalXP": 10052,
+        "badges": 15,
         "bio": ""
       },
       "subjects": {
@@ -30,39 +30,41 @@
           "averageScore": null
         },
         "science": {
-          "progress": 80,
+          "progress": 93,
           "topicsCompleted": [
             "Biology",
             "Physics",
-            "Astronomy"
+            "Astronomy",
+            "Chemistry",
+            "Earth Science"
           ],
           "nextMilestone": "Chemical Reactions",
-          "lastPracticedAt": "2025-08-14T04:27:26.840Z",
-          "weeklySessions": 80,
+          "lastPracticedAt": "2025-08-15T10:35:59.329Z",
+          "weeklySessions": 84,
           "bestScore": 10,
-          "totalQuizzes": 1,
-          "averageScore": null
+          "totalQuizzes": 4,
+          "averageScore": 6.75
         },
         "english": {
-          "progress": 72,
+          "progress": 79,
           "topicsCompleted": [
             "Grammar",
             "Reading"
           ],
           "nextMilestone": "Essay Writing",
-          "lastPracticedAt": "2025-08-14T07:30:42.012Z",
-          "weeklySessions": 16,
+          "lastPracticedAt": "2025-08-14T10:47:47.315Z",
+          "weeklySessions": 17,
           "bestScore": 9,
-          "totalQuizzes": 1,
-          "averageScore": null
+          "totalQuizzes": 2,
+          "averageScore": 3.5
         },
         "history": {
-          "weeklySessions": 40,
-          "lastPracticedAt": "2025-08-14T04:29:56.744Z",
+          "weeklySessions": 20,
+          "lastPracticedAt": "2025-08-14T10:16:23.267Z",
           "bestScore": 9,
-          "progress": 77,
-          "totalQuizzes": 2,
-          "averageScore": 4.5,
+          "progress": 76,
+          "totalQuizzes": 3,
+          "averageScore": 4.333333333333333,
           "topicsCompleted": [
             "Economics"
           ]
@@ -96,6 +98,14 @@
           "earned": true,
           "earnedAt": "2025-08-14T03:11:31.364Z",
           "xpReward": 100
+        },
+        {
+          "id": "scholar",
+          "name": "Scholar",
+          "description": "Reached level 10!",
+          "earned": true,
+          "earnedAt": "2025-08-14T10:16:23.268Z",
+          "xpReward": 300
         }
       ],
       "quizHistory": [
@@ -108,212 +118,28 @@
           "durationSeconds": 240
         },
         {
-          "quizId": "quiz-2025-08-13T12-25-56-667Z",
-          "subject": "history",
-          "score": 7,
-          "total": 10,
-          "takenAt": "2025-08-13T12:25:56.667Z",
-          "durationSeconds": 148
-        },
-        {
-          "quizId": "quiz-2025-08-13T15-25-09-181Z",
-          "subject": "history",
-          "score": 6,
-          "total": 10,
-          "takenAt": "2025-08-13T15:25:09.181Z",
-          "durationSeconds": 81
-        },
-        {
-          "quizId": "quiz-2025-08-13T15-28-14-029Z",
+          "quizId": "quiz-2025-08-14T10-18-13-196Z",
           "subject": "science",
           "score": 9,
           "total": 10,
-          "takenAt": "2025-08-13T15:28:14.029Z",
-          "durationSeconds": 73
-        },
-        {
-          "quizId": "quiz-2025-08-13T15-42-20-511Z",
-          "subject": "science",
-          "score": 8,
-          "total": 10,
-          "takenAt": "2025-08-13T15:42:20.511Z",
-          "durationSeconds": 65
-        },
-        {
-          "quizId": "quiz-2025-08-13T15-45-43-432Z",
-          "subject": "math",
-          "score": 3,
-          "total": 10,
-          "takenAt": "2025-08-13T15:45:43.432Z",
-          "durationSeconds": 103
-        },
-        {
-          "quizId": "quiz-2025-08-13T16-36-34-826Z",
-          "subject": "history",
-          "score": 2,
-          "total": 10,
-          "takenAt": "2025-08-13T16:36:34.826Z",
-          "durationSeconds": 110
-        },
-        {
-          "quizId": "quiz-2025-08-13T16-37-43-074Z",
-          "subject": "history",
-          "score": 6,
-          "total": 10,
-          "takenAt": "2025-08-13T16:37:43.074Z",
-          "durationSeconds": 51
-        },
-        {
-          "quizId": "quiz-2025-08-13T16-40-13-862Z",
-          "subject": "history",
-          "score": 3,
-          "total": 10,
-          "takenAt": "2025-08-13T16:40:13.862Z",
-          "durationSeconds": 77
-        },
-        {
-          "quizId": "quiz-2025-08-13T16-41-33-433Z",
-          "subject": "history",
-          "score": 3,
-          "total": 10,
-          "takenAt": "2025-08-13T16:41:33.433Z",
-          "durationSeconds": 57
-        },
-        {
-          "quizId": "quiz-2025-08-13T16-43-30-814Z",
-          "subject": "history",
-          "score": 8,
-          "total": 10,
-          "takenAt": "2025-08-13T16:43:30.814Z",
-          "durationSeconds": 81
-        },
-        {
-          "quizId": "quiz-2025-08-13T16-46-42-828Z",
-          "subject": "english",
-          "score": 6,
-          "total": 10,
-          "takenAt": "2025-08-13T16:46:42.828Z",
-          "durationSeconds": 178
-        },
-        {
-          "quizId": "quiz-2025-08-13T16-48-32-468Z",
-          "subject": "english",
-          "score": 9,
-          "total": 10,
-          "takenAt": "2025-08-13T16:48:32.468Z",
-          "durationSeconds": 102
-        },
-        {
-          "quizId": "quiz-2025-08-13T16-59-10-616Z",
-          "subject": "science",
-          "score": 10,
-          "total": 10,
-          "takenAt": "2025-08-13T16:59:10.616Z",
-          "durationSeconds": 64
-        },
-        {
-          "quizId": "quiz-2025-08-13T17-02-45-640Z",
-          "subject": "science",
-          "score": 9,
-          "total": 10,
-          "takenAt": "2025-08-13T17:02:45.640Z",
-          "durationSeconds": 120
-        },
-        {
-          "quizId": "quiz-2025-08-14T02-41-27-843Z",
-          "subject": "science",
-          "score": 10,
-          "total": 10,
-          "takenAt": "2025-08-14T02:41:27.843Z",
-          "durationSeconds": 83
-        },
-        {
-          "quizId": "quiz-2025-08-14T02-43-04-204Z",
-          "subject": "science",
-          "score": 9,
-          "total": 10,
-          "takenAt": "2025-08-14T02:43:04.204Z",
-          "durationSeconds": 84
-        },
-        {
-          "quizId": "quiz-2025-08-14T02-45-04-524Z",
-          "subject": "science",
-          "score": 9,
-          "total": 10,
-          "takenAt": "2025-08-14T02:45:04.524Z",
-          "durationSeconds": 114
-        },
-        {
-          "quizId": "quiz-2025-08-14T02-46-29-761Z",
-          "subject": "science",
-          "score": 9,
-          "total": 10,
-          "takenAt": "2025-08-14T02:46:29.761Z",
-          "durationSeconds": 76
-        },
-        {
-          "quizId": "quiz-2025-08-14T02-49-11-584Z",
-          "subject": "math",
-          "score": 9,
-          "total": 10,
-          "takenAt": "2025-08-14T02:49:11.584Z",
-          "durationSeconds": 150
-        },
-        {
-          "quizId": "quiz-2025-08-14T02-50-42-878Z",
-          "subject": "math",
-          "score": 9,
-          "total": 10,
-          "takenAt": "2025-08-14T02:50:42.878Z",
-          "durationSeconds": 79
-        },
-        {
-          "quizId": "quiz-2025-08-14T02-55-09-816Z",
-          "subject": "math",
-          "score": 9,
-          "total": 10,
-          "takenAt": "2025-08-14T02:55:09.816Z",
-          "durationSeconds": 116
-        },
-        {
-          "quizId": "quiz-2025-08-14T03-09-28-024Z",
-          "subject": "math",
-          "score": 8,
-          "total": 10,
-          "takenAt": "2025-08-14T03:09:28.024Z",
-          "durationSeconds": 172
-        },
-        {
-          "quizId": "quiz-2025-08-14T03-11-31-364Z",
-          "subject": "science",
-          "score": 10,
-          "total": 10,
-          "takenAt": "2025-08-14T03:11:31.364Z",
-          "durationSeconds": 95
-        },
-        {
-          "quizId": "quiz-2025-08-14T03-14-29-501Z",
-          "subject": "history",
-          "score": 5,
-          "total": 10,
-          "takenAt": "2025-08-14T03:14:29.501Z",
+          "takenAt": "2025-08-14T10:18:13.196Z",
           "durationSeconds": 99
         },
         {
-          "quizId": "quiz-2025-08-14T04-29-56-744Z",
-          "subject": "history",
-          "score": 9,
+          "quizId": "quiz-2025-08-14T10-47-47-314Z",
+          "subject": "english",
+          "score": 7,
           "total": 10,
-          "takenAt": "2025-08-14T04:29:56.744Z",
-          "durationSeconds": 145
+          "takenAt": "2025-08-14T10:47:47.315Z",
+          "durationSeconds": 136
         },
         {
-          "quizId": "quiz-2025-08-14T07-30-42-011Z",
-          "subject": "english",
+          "quizId": "quiz-2025-08-15T10-35-59-328Z",
+          "subject": "science",
           "score": 8,
           "total": 10,
-          "takenAt": "2025-08-14T07:30:42.012Z",
-          "durationSeconds": 92
+          "takenAt": "2025-08-15T10:35:59.329Z",
+          "durationSeconds": 75
         }
       ],
       "settings": {
@@ -338,7 +164,7 @@
       },
       "activity": {
         "createdAt": "2025-08-13T07:00:00.000Z",
-        "updatedAt": "2025-08-14T07:30:42.013Z",
+        "updatedAt": "2025-08-15T10:35:59.330Z",
         "lastLogin": "2025-08-13T09:05:00.000Z"
       }
     }

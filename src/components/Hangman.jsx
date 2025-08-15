@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Play, X, Sparkles, Gift, RotateCcw } from "lucide-react";
+import {
+  Play,
+  X,
+  Sparkles,
+  Gift,
+  RotateCcw,
+  PersonStandingIcon,
+} from "lucide-react";
 
 const DEFAULT_WORDS = [
   "REACT",
@@ -229,7 +236,7 @@ const Hangman = ({ words = DEFAULT_WORDS, rewardXP = 50 }) => {
           {/* Left: icon + title + description */}
           <div className="flex items-start sm:items-center space-x-3 min-w-0 w-full">
             <div className="w-12 h-12 sm:w-14 md:w-16 bg-gradient-to-r from-pink-500 to-cyan-500 rounded-lg flex items-center justify-center shadow-md flex-shrink-0">
-              <Gift className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+              <PersonStandingIcon className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
             </div>
 
             <div className="min-w-0">
